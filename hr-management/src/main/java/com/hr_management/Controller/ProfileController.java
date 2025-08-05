@@ -24,7 +24,6 @@ public class ProfileController {
         try {
             String username = authentication.getName();
 
-            // 1. Create ProfileDTO from the text parts of the form
             ProfileDTO profileDTO = new ProfileDTO();
             profileDTO.setDob(textParts.get("dob"));
             profileDTO.setFatherName(textParts.get("fatherName"));
@@ -32,7 +31,6 @@ public class ProfileController {
             profileDTO.setEmergencyContactNumber(textParts.get("emergencyContactNumber"));
             profileDTO.setIsFresher(Boolean.parseBoolean(textParts.get("isFresher")));
 
-            // 2. Make a single call to the service layer to handle all business logic
             profileService.submitProfile(username, profileDTO, textParts, fileParts);
 
             return ResponseEntity.ok(Map.of("message", "Profile submitted successfully for HR verification."));
@@ -40,9 +38,21 @@ public class ProfileController {
         } catch (IllegalArgumentException | IllegalStateException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         } catch (Exception e) {
-            // Log the full error for debugging purposes
             e.printStackTrace();
             return ResponseEntity.status(500).body(Map.of("message", "An unexpected error occurred: " + e.getMessage()));
+        }
+    }
+
+    // --- CHANGE HERE: Correct the PostMapping path ---
+    @PostMapping("/request-edit")
+    public ResponseEntity<?> requestProfileUpdate(Authentication authentication) {
+        try {
+            String username = authentication.getName();
+            // The service method name is okay, we will fix the logic inside it
+            profileService.requestProfileUpdate(username);
+            return ResponseEntity.ok(Map.of("message", "Profile update request submitted successfully."));
+        } catch (Exception e) {
+            return ResponseEntity.status(400).body(Map.of("message", e.getMessage()));
         }
     }
 }

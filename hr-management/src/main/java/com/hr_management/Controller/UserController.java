@@ -40,6 +40,18 @@ public class UserController {
     @Autowired
     private DepartmentService departmentService;
 
+    @GetMapping("/users/all")
+    @PreAuthorize("hasRole('HR') or hasRole('SUPER_ADMIN')") // Only HR and Super Admin can get the full list
+    public ResponseEntity<List<UserDTO>> getAllUsersForDropdown() {
+        logger.info("Fetching all users for dropdown");
+        try {
+            List<UserDTO> users = userService.getAllUsersSimple();
+            return ResponseEntity.ok(users);
+        } catch (Exception e) {
+            logger.error("Error fetching all users: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Collections.emptyList());
+        }
+    }
     // --- The method below is the one we are fixing ---
     @GetMapping("/users/me")
     public ResponseEntity<?> getCurrentUser() {

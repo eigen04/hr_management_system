@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, CalendarCheck, FileText, Clock, CheckCircle, XCircle, AlertCircle, User, Menu, X, LogOut, Users, Trash2, UserCircle } from 'lucide-react';
+import { Calendar, CalendarCheck, FileText, Clock, CheckCircle, XCircle, AlertCircle, User, Menu, X, LogOut, Users, Trash2, UserCircle, Edit3 } from 'lucide-react';
 
 export default function GenericDashboard() {
   const [profileFormData, setProfileFormData] = useState({
@@ -69,6 +69,8 @@ export default function GenericDashboard() {
   const [activeView, setActiveView] = useState('dashboard');
   const navigate = useNavigate();
 
+  const acceptedFileTypes = ".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png";
+
   const today = new Date().toISOString().split('T')[0];
   const currentMonth = new Date().getMonth() + 1;
   const currentYear = new Date().getFullYear();
@@ -107,26 +109,18 @@ export default function GenericDashboard() {
             const cleanStatus = data.profileVerificationStatus.trim();
             setProfileVerificationStatus(cleanStatus);
 
-            // 2. If verified, populate the form state so the details can be displayed
-            // In GenericDashboard.js -> inside the useEffect -> fetchUserData -> if(response.ok)
-// Find this block...
-            if (cleanStatus === 'VERIFIED') {
-
-              // --- REPLACE THE OLD LOGIC WITH THIS NEW LOGIC ---
-
+            if (['VERIFIED', 'EDIT_REQUESTED', 'EDIT_ALLOWED'].includes(cleanStatus)) {
               const allDocsFromServer = data.documents || [];
               const standardDocs = {};
               const prevCompanyDocs = {};
               const additionalDocs = [];
 
               allDocsFromServer.forEach(doc => {
-                // The frontend expects an object with a 'name' property for display
                 const docInfo = { name: doc.fileName };
 
                 if (doc.isPreviousCompany) {
                   prevCompanyDocs[doc.documentType] = docInfo;
                 } else if (doc.documentType === 'additional_document') {
-                  // Use customDocumentName for the display name
                   additionalDocs.push({ name: doc.customDocumentName, file: docInfo });
                 } else {
                   standardDocs[doc.documentType] = docInfo;
@@ -135,7 +129,7 @@ export default function GenericDashboard() {
 
               setProfileFormData(prev => ({
                 ...prev,
-                dob: data.dob ? data.dob.split('T')[0] : '', // Format date to yyyy-mm-dd
+                dob: data.dob ? data.dob.split('T')[0] : '',
                 fatherName: data.fatherName || '',
                 motherName: data.motherName || '',
                 emergencyContactNumber: data.emergencyContactNumber || '',
@@ -258,7 +252,7 @@ export default function GenericDashboard() {
     fetchLeaveData();
   }, [navigate]);
 
-  // useEffect for success message timeout
+  // --- Other useEffect hooks and handlers from your code...
   useEffect(() => {
     if (successMessage) {
       const timer = setTimeout(() => setSuccessMessage(''), 5000);
@@ -266,7 +260,6 @@ export default function GenericDashboard() {
     }
   }, [successMessage]);
 
-  // useEffect for leave form updates
   useEffect(() => {
     if (leaveFormData.startDate && (leaveFormData.leaveType === 'ML' || leaveFormData.leaveType === 'PL')) {
       const calculatedEndDate = calculateEndDate(leaveFormData.startDate, leaveFormData.leaveType);
@@ -297,6 +290,7 @@ export default function GenericDashboard() {
   };
 
   const calculateLeaveDays = (startDate, endDate, leaveType) => {
+    // ... (This function remains unchanged)
     const start = new Date(startDate);
     if (isNaN(start.getTime())) return 0;
 
@@ -327,6 +321,8 @@ export default function GenericDashboard() {
     return days;
   };
 
+  // --- All other handlers like handleLeaveSubmit, handleLeaveAction, etc. remain the same ---
+  // ... (paste all your other functions here, from calculateEndDate up to, but not including, renderProfileView)
   const calculateEndDate = (startDate, leaveType) => {
     if (!startDate) return '';
     const start = new Date(startDate);
@@ -716,6 +712,14 @@ export default function GenericDashboard() {
         return <CheckCircle className="w-5 h-5 text-green-500"/>;
       case 'REJECTED':
         return <XCircle className="w-5 h-5 text-red-500"/>;
+        // --- MODIFICATION START ---
+      case 'EDIT_REQUESTED':
+        return <Clock className="w-5 h-5 text-yellow-500" />;
+      case 'EDIT_ALLOWED':
+        return <Edit3 className="w-5 h-5 text-blue-500" />;
+      case 'VERIFIED':
+        return <CheckCircle className="w-5 h-5 text-green-500"/>;
+        // --- MODIFICATION END ---
       default:
         return <AlertCircle className="w-5 h-5 text-gray-500"/>;
     }
@@ -729,6 +733,16 @@ export default function GenericDashboard() {
         return 'text-green-600 bg-green-50';
       case 'REJECTED':
         return 'text-red-600 bg-red-50';
+        // --- MODIFICATION START ---
+      case 'VERIFIED':
+        return 'text-green-600 bg-green-50';
+      case 'SUBMITTED':
+        return 'text-blue-600 bg-blue-50';
+      case 'EDIT_REQUESTED':
+        return 'text-yellow-600 bg-yellow-50';
+      case 'EDIT_ALLOWED':
+        return 'text-blue-600 bg-blue-50';
+        // --- MODIFICATION END ---
       default:
         return 'text-gray-600 bg-gray-50';
     }
@@ -872,8 +886,8 @@ export default function GenericDashboard() {
       ],
     },
   ];
-
   const renderDashboardView = () => {
+    // This function remains unchanged
     if (isLoading) {
       return (
           <div className="flex justify-center items-center h-64">
@@ -923,6 +937,7 @@ export default function GenericDashboard() {
     );
   };
   const handleFileChange = (e, docType, isPreviousCompany = false, index = null) => {
+    // This function remains unchanged
     const file = e.target.files[0];
     if (file) {
       if (isPreviousCompany) {
@@ -954,8 +969,8 @@ export default function GenericDashboard() {
       }
     }
   };
-
   const handleAdditionalDocNameChange = (index, name) => {
+    // This function remains unchanged
     setProfileFormData((prev) => {
       const updatedAdditionalDocuments = [...prev.additionalDocuments];
       updatedAdditionalDocuments[index] = {
@@ -966,12 +981,22 @@ export default function GenericDashboard() {
     });
   };
   const addAdditionalDocument = () => {
+    // This function remains unchanged
     setProfileFormData((prev) => ({
       ...prev,
       additionalDocuments: [...prev.additionalDocuments, { name: '', file: null }],
     }));
   };
+  const removeAdditionalDocument = (indexToRemove) => {
+    // This function remains unchanged
+    setProfileFormData((prev) => ({
+      ...prev,
+      additionalDocuments: prev.additionalDocuments.filter((_, index) => index !== indexToRemove),
+    }));
+  };
+
   const handleProfileSubmit = async () => {
+    // This function remains unchanged
     setIsSubmitting(true);
     setError('');
     setSuccessMessage('');
@@ -1088,7 +1113,44 @@ export default function GenericDashboard() {
     }
   };
 
+  // --- MODIFICATION START: New handler function for edit request ---
+  const handleEditRequest = async () => {
+    setIsSubmitting(true);
+    setError('');
+    setSuccessMessage('');
 
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        setError('Session expired. Please log in again.');
+        navigate('/');
+        return;
+      }
+
+      const response = await fetch('http://localhost:8081/api/users/request-edit', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        setSuccessMessage('Your request to edit the profile has been sent to HR for approval.');
+        setProfileVerificationStatus('EDIT_REQUESTED'); // Update UI immediately
+      } else {
+        const errorData = await response.json();
+        setError(errorData.message || 'Failed to send edit request.');
+      }
+    } catch (err) {
+      setError('An error occurred. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  // --- MODIFICATION END ---
+
+
+  // --- MODIFICATION START: Fully updated renderProfileView ---
   const renderProfileView = () => {
     if (isLoading) {
       return (
@@ -1109,17 +1171,37 @@ export default function GenericDashboard() {
       );
     }
 
+    // Determine if the form should be disabled based on the status
+    const isFormDisabled = ['SUBMITTED', 'VERIFIED', 'EDIT_REQUESTED'].includes(profileVerificationStatus);
+    const statusText = profileVerificationStatus.replace(/_/g, ' ');
+
     return (
         <div className="space-y-6">
           <h2 className="text-2xl font-semibold text-gray-900">Profile Details</h2>
           <div className="bg-white rounded-lg shadow-lg p-6">
             <div className="mb-4">
-          <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(profileVerificationStatus)}`}>
-            {getStatusIcon(profileVerificationStatus)}
-            <span className="ml-1">{profileVerificationStatus === 'VERIFIED' ? 'Profile Verified' : profileVerificationStatus}</span>
-          </span>
+              <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium capitalize ${getStatusColor(profileVerificationStatus)}`}>
+                {getStatusIcon(profileVerificationStatus)}
+                <span className="ml-1">{statusText}</span>
+              </span>
             </div>
-            {profileVerificationStatus === 'VERIFIED' ? (
+
+            {profileVerificationStatus === 'EDIT_REQUESTED' && (
+                <div className="text-center py-6 bg-blue-50 border border-blue-200 rounded-lg mb-6">
+                  <p className="text-blue-700 text-lg font-medium">Edit Request Pending</p>
+                  <p className="text-gray-600 mt-1">Your request to edit the profile is awaiting approval from HR.</p>
+                </div>
+            )}
+
+            {profileVerificationStatus === 'EDIT_ALLOWED' && (
+                <div className="text-center py-6 bg-green-50 border border-green-200 rounded-lg mb-6">
+                  <p className="text-green-700 text-lg font-medium">Profile Unlocked for Editing</p>
+                  <p className="text-gray-600 mt-1">Your request has been approved. Please make your changes and re-submit for verification.</p>
+                </div>
+            )}
+
+            {/* Read-Only view for VERIFIED and EDIT_REQUESTED */}
+            {(profileVerificationStatus === 'VERIFIED' || profileVerificationStatus === 'EDIT_REQUESTED') ? (
                 <div className="space-y-6">
                   <div className="flex items-center mb-6">
                     <UserCircle size={48} className="text-blue-500 mr-4"/>
@@ -1129,235 +1211,134 @@ export default function GenericDashboard() {
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Employee ID</p>
-                      <p className="text-lg font-semibold text-gray-900">{userData.employeeId || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Email</p>
-                      <p className="text-lg font-semibold text-gray-900">{userData.email || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Department</p>
-                      <p className="text-lg font-semibold text-gray-900">{userData.department || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Reporting To</p>
-                      <p className="text-lg font-semibold text-gray-900">{userData.reportingTo?.fullName || 'Not Assigned'}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Joining Date</p>
-                      <p className="text-lg font-semibold text-gray-900">{formatDate(userData.joinDate)}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Gender</p>
-                      <p className="text-lg font-semibold text-gray-900">{userData.gender || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Date of Birth</p>
-                      <p className="text-lg font-semibold text-gray-900">{profileFormData.dob || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Father's Name</p>
-                      <p className="text-lg font-semibold text-gray-900">{profileFormData.fatherName || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Mother's Name</p>
-                      <p className="text-lg font-semibold text-gray-900">{profileFormData.motherName || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Emergency Contact Number</p>
-                      <p className="text-lg font-semibold text-gray-900">{profileFormData.emergencyContactNumber || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Fresher Status</p>
-                      <p className="text-lg font-semibold text-gray-900">{profileFormData.isFresher ? 'Fresher' : 'Experienced'}</p>
-                    </div>
+                    <div><p className="text-sm font-medium text-gray-600">Employee ID</p><p className="text-lg font-semibold text-gray-900">{userData.employeeId || 'N/A'}</p></div>
+                    <div><p className="text-sm font-medium text-gray-600">Email</p><p className="text-lg font-semibold text-gray-900">{userData.email || 'N/A'}</p></div>
+                    <div><p className="text-sm font-medium text-gray-600">Department</p><p className="text-lg font-semibold text-gray-900">{userData.department || 'N/A'}</p></div>
+                    <div><p className="text-sm font-medium text-gray-600">Reporting To</p><p className="text-lg font-semibold text-gray-900">{userData.reportingTo?.fullName || 'Not Assigned'}</p></div>
+                    <div><p className="text-sm font-medium text-gray-600">Joining Date</p><p className="text-lg font-semibold text-gray-900">{formatDate(userData.joinDate)}</p></div>
+                    <div><p className="text-sm font-medium text-gray-600">Gender</p><p className="text-lg font-semibold text-gray-900">{userData.gender || 'N/A'}</p></div>
+                    <div><p className="text-sm font-medium text-gray-600">Date of Birth</p><p className="text-lg font-semibold text-gray-900">{profileFormData.dob || 'N/A'}</p></div>
+                    <div><p className="text-sm font-medium text-gray-600">Father's Name</p><p className="text-lg font-semibold text-gray-900">{profileFormData.fatherName || 'N/A'}</p></div>
+                    <div><p className="text-sm font-medium text-gray-600">Mother's Name</p><p className="text-lg font-semibold text-gray-900">{profileFormData.motherName || 'N/A'}</p></div>
+                    <div><p className="text-sm font-medium text-gray-600">Emergency Contact Number</p><p className="text-lg font-semibold text-gray-900">{profileFormData.emergencyContactNumber || 'N/A'}</p></div>
+                    <div><p className="text-sm font-medium text-gray-600">Fresher Status</p><p className="text-lg font-semibold text-gray-900">{profileFormData.isFresher ? 'Fresher' : 'Experienced'}</p></div>
                   </div>
 
-                  {/* --- DOCUMENT SECTIONS REMOVED AS REQUESTED --- */}
-
-                  <div className="text-center py-6">
-                    <p className="text-green-600 text-lg font-medium">Your profile has been verified by HR.</p>
-                    <p className="text-gray-600">All submitted details and documents have been approved.</p>
-                  </div>
+                  {profileVerificationStatus === 'VERIFIED' && (
+                      <div className="text-center pt-6 mt-6 border-t">
+                        <p className="text-gray-600 mb-4">Need to update your information? Request HR to unlock your profile.</p>
+                        <button
+                            onClick={handleEditRequest}
+                            disabled={isSubmitting}
+                            className={`inline-flex items-center justify-center py-2.5 px-6 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
+                                isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-orange-600 hover:bg-orange-700'
+                            } focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors duration-200`}
+                        >
+                          {isSubmitting ? 'Submitting...' : <><Edit3 size={16} className="mr-2"/> Request Profile Edit</>}
+                        </button>
+                      </div>
+                  )}
                 </div>
             ) : (
+                // EDITABLE FORM VIEW for PENDING, EDIT_ALLOWED, SUBMITTED
                 <div className="space-y-4">
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
-                      <input
-                          type="date"
-                          value={profileFormData.dob}
-                          onChange={(e) => setProfileFormData({ ...profileFormData, dob: e.target.value })}
-                          className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          disabled={profileVerificationStatus === 'SUBMITTED'}
-                      />
+                      <input type="date" value={profileFormData.dob} onChange={(e) => setProfileFormData({ ...profileFormData, dob: e.target.value })} className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" disabled={isFormDisabled} />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Passport Size Photo</label>
-                      <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => setProfileFormData({ ...profileFormData, photo: e.target.files[0] })}
-                          className="w-full p-2 border border-gray-300 rounded-md"
-                          disabled={profileVerificationStatus === 'SUBMITTED'}
-                      />
-                      {profileFormData.photo && (
-                          <p className="text-sm text-green-600 mt-1">File selected: {profileFormData.photo.name}</p>
-                      )}
+                      <input type="file" accept="image/*" onChange={(e) => setProfileFormData({ ...profileFormData, photo: e.target.files[0] })} className="w-full p-2 border border-gray-300 rounded-md" disabled={isFormDisabled} />
+                      {profileFormData.photo && <p className="text-sm text-green-600 mt-1">File selected: {profileFormData.photo.name}</p>}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Father's Name</label>
-                      <input
-                          type="text"
-                          value={profileFormData.fatherName}
-                          onChange={(e) => setProfileFormData({ ...profileFormData, fatherName: e.target.value })}
-                          className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          disabled={profileVerificationStatus === 'SUBMITTED'}
-                      />
+                      <input type="text" value={profileFormData.fatherName} onChange={(e) => setProfileFormData({ ...profileFormData, fatherName: e.target.value })} className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" disabled={isFormDisabled} />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Mother's Name</label>
-                      <input
-                          type="text"
-                          value={profileFormData.motherName}
-                          onChange={(e) => setProfileFormData({ ...profileFormData, motherName: e.target.value })}
-                          className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          disabled={profileVerificationStatus === 'SUBMITTED'}
-                      />
+                      <input type="text" value={profileFormData.motherName} onChange={(e) => setProfileFormData({ ...profileFormData, motherName: e.target.value })} className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" disabled={isFormDisabled} />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Emergency Contact Number</label>
-                      <input
-                          type="tel"
-                          value={profileFormData.emergencyContactNumber}
-                          onChange={(e) => setProfileFormData({ ...profileFormData, emergencyContactNumber: e.target.value })}
-                          className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          disabled={profileVerificationStatus === 'SUBMITTED'}
-                          placeholder="Enter emergency contact number"
-                      />
+                      <input type="tel" value={profileFormData.emergencyContactNumber} onChange={(e) => setProfileFormData({ ...profileFormData, emergencyContactNumber: e.target.value })} className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" disabled={isFormDisabled} placeholder="Enter emergency contact number" />
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">Are you a Fresher?</label>
-                      <select
-                          value={profileFormData.isFresher}
-                          onChange={(e) => setProfileFormData({ ...profileFormData, isFresher: e.target.value === 'true' })}
-                          className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          disabled={profileVerificationStatus === 'SUBMITTED'}
-                      >
+                      <select value={profileFormData.isFresher} onChange={(e) => setProfileFormData({ ...profileFormData, isFresher: e.target.value === 'true' })} className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" disabled={isFormDisabled}>
                         <option value={true}>Yes, I am a Fresher</option>
                         <option value={false}>No, I have previous work experience</option>
                       </select>
                     </div>
                   </div>
+
                   <div className="mt-6">
                     <h3 className="text-lg font-semibold text-gray-700 mb-4">Upload Documents</h3>
                     <div className="grid md:grid-cols-2 gap-4">
                       {documentTypes.map((docType) => (
                           <div key={docType}>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              {docType.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                            </label>
-                            <input
-                                type="file"
-                                accept=".pdf,.jpg,.jpeg,.png"
-                                onChange={(e) => handleFileChange(e, docType)}
-                                className="w-full p-2 border border-gray-300 rounded-md"
-                                disabled={profileVerificationStatus === 'SUBMITTED'}
-                            />
-                            {profileFormData.documents[docType] && (
-                                <p className="text-sm text-green-600 mt-1">File selected: {profileFormData.documents[docType].name}</p>
-                            )}
+                            <label className="block text-sm font-medium text-gray-700 mb-1">{docType.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</label>
+                            <input type="file" accept={acceptedFileTypes} onChange={(e) => handleFileChange(e, docType)} className="w-full p-2 border border-gray-300 rounded-md" disabled={isFormDisabled}/>
+                            {profileFormData.documents[docType] && (<p className="text-sm text-green-600 mt-1">File selected: {profileFormData.documents[docType].name}</p>)}
                           </div>
                       ))}
                     </div>
                   </div>
+
                   {!profileFormData.isFresher && (
                       <div className="mt-6">
                         <h3 className="text-lg font-semibold text-gray-700 mb-4">Previous Company Documents</h3>
                         <div className="grid md:grid-cols-2 gap-4">
                           {previousCompanyDocumentTypes.map((docType) => (
                               <div key={docType}>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                  {docType.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                                </label>
-                                <input
-                                    type="file"
-                                    accept=".pdf,.jpg,.jpeg,.png"
-                                    onChange={(e) => handleFileChange(e, docType, true)}
-                                    className="w-full p-2 border border-gray-300 rounded-md"
-                                    disabled={profileVerificationStatus === 'SUBMITTED'}
-                                />
-                                {profileFormData.previousCompanyDocuments[docType] && (
-                                    <p className="text-sm text-green-600 mt-1">File selected: {profileFormData.previousCompanyDocuments[docType].name}</p>
-                                )}
+                                <label className="block text-sm font-medium text-gray-700 mb-1">{docType.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</label>
+                                <input type="file" accept={acceptedFileTypes} onChange={(e) => handleFileChange(e, docType, true)} className="w-full p-2 border border-gray-300 rounded-md" disabled={isFormDisabled} />
+                                {profileFormData.previousCompanyDocuments[docType] && (<p className="text-sm text-green-600 mt-1">File selected: {profileFormData.previousCompanyDocuments[docType].name}</p>)}
                               </div>
                           ))}
                         </div>
                       </div>
                   )}
+
                   <div className="mt-6">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-lg font-semibold text-gray-700 mb-4">Additional Documents</h3>
-                      {profileVerificationStatus !== 'SUBMITTED' && (
-                          <button
-                              onClick={addAdditionalDocument}
-                              className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
-                          >
-                            Add Document
-                          </button>
+                    <div className="flex justify-between items-center mb-2">
+                      <h3 className="text-lg font-semibold text-gray-700">Additional Documents</h3>
+                      {!isFormDisabled && (
+                          <button onClick={addAdditionalDocument} className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 text-sm font-medium">Add Document</button>
                       )}
                     </div>
                     {profileFormData.additionalDocuments.map((doc, index) => (
-                        <div key={index} className="grid md:grid-cols-2 gap-4 mt-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Document Name</label>
-                            <input
-                                type="text"
-                                value={doc.name || ''}
-                                onChange={(e) => handleAdditionalDocNameChange(index, e.target.value)}
-                                className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                disabled={profileVerificationStatus === 'SUBMITTED'}
-                                placeholder="Enter document name"
-                            />
+                        <div key={index} className="p-4 border rounded-md mt-4 bg-gray-50">
+                          <div className="grid md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Document Name</label>
+                              <input type="text" value={doc.name || ''} onChange={(e) => handleAdditionalDocNameChange(index, e.target.value)} className="w-full p-2 border border-gray-300 rounded-md" disabled={isFormDisabled} placeholder="Enter document name"/>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Upload Document</label>
+                              <input type="file" accept={acceptedFileTypes} onChange={(e) => handleFileChange(e, null, false, index)} className="w-full p-2 border border-gray-300 rounded-md" disabled={isFormDisabled}/>
+                              {doc.file && (<p className="text-sm text-green-600 mt-1">File selected: {doc.file.name}</p>)}
+                            </div>
                           </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Upload Document</label>
-                            <input
-                                type="file"
-                                accept=".pdf,.jpg,.jpeg,.png"
-                                onChange={(e) => handleFileChange(e, null, false, index)}
-                                className="w-full p-2 border border-gray-300 rounded-md"
-                                disabled={profileVerificationStatus === 'SUBMITTED'}
-                            />
-                            {doc.file && (
-                                <p className="text-sm text-green-600 mt-1">File selected: {doc.file.name}</p>
-                            )}
-                          </div>
+                          {!isFormDisabled && (
+                              <div className="text-right mt-3">
+                                <button onClick={() => removeAdditionalDocument(index)} className="inline-flex items-center px-3 py-1 text-sm bg-red-100 text-red-700 rounded-md hover:bg-red-200"><Trash2 size={16} className="mr-1.5" />Remove</button>
+                              </div>
+                          )}
                         </div>
                     ))}
                   </div>
-                  {profileVerificationStatus !== 'SUBMITTED' && (
+
+                  {!isFormDisabled && (
                       <button
                           onClick={handleProfileSubmit}
                           disabled={isSubmitting}
-                          className={`w-full flex justify-center items-center py-2.5 px-4 mt-6 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
-                              isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-700 hover:bg-blue-800'
-                          } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200`}
+                          className={`w-full flex justify-center items-center py-2.5 px-4 mt-6 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-700 hover:bg-blue-800'} focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200`}
                       >
                         {isSubmitting ? (
-                            <span className="flex items-center">
-                    <svg className="animate-spin h-5 w-5 mr-2 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-                    </svg>
-                    Submitting...
-                  </span>
-                        ) : (
-                            'Submit Profile for Verification'
-                        )}
+                            <span className="flex items-center"><svg className="animate-spin h-5 w-5 mr-2 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>Submitting...</span>
+                        ) : 'Submit Profile for Verification'}
                       </button>
                   )}
                 </div>
@@ -1366,7 +1347,11 @@ export default function GenericDashboard() {
         </div>
     );
   };
+  // --- MODIFICATION END ---
 
+  // --- Paste the rest of your functions here ---
+  // renderApplyLeaveView, renderLeaveApplicationsView, etc.
+  // ... all of them remain unchanged ...
   const renderApplyLeaveView = () => {
     const isHalfDay = leaveFormData.leaveType === 'HALF_DAY_CL' || leaveFormData.leaveType === 'HALF_DAY_EL' || leaveFormData.leaveType === 'HALF_DAY_LWP';
     const isFixedDuration = leaveFormData.leaveType === 'ML' || leaveFormData.leaveType === 'PL';
@@ -1904,6 +1889,7 @@ export default function GenericDashboard() {
       setIsSubmitting(false);
     }
   };
+
 
   const renderMainContent = () => {
     if (error && (error.includes('Session expired') || error.includes('Failed to fetch user data'))) {

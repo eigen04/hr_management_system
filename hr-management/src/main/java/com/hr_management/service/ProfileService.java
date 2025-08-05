@@ -35,6 +35,10 @@ public class ProfileService {
     @Autowired
     private DocumentRepository documentRepository;
 
+    // --- CHANGE 1: INJECT THE EMAILSERVICE INSTANCE ---
+    @Autowired
+    private EmailService emailService;
+
     private final Path rootLocation = Paths.get("uploads");
 
     private final List<String> documentTypes = Arrays.asList(
@@ -54,13 +58,25 @@ public class ProfileService {
         }
     }
 
+    // ... (No changes needed for submitProfile, saveFileAndCreateDocument, getProfilesForVerification, getProfileDetailsForHr, approveProfile) ...
     @Transactional
     public void submitProfile(String username, ProfileDTO profileDTO, Map<String, String> textParts, Map<String, MultipartFile> fileParts) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("User not found with username: " + username));
 
-        if ("SUBMITTED".equals(user.getProfileVerificationStatus()) || "VERIFIED".equals(user.getProfileVerificationStatus())) {
-            throw new IllegalStateException("Profile has already been submitted or verified and cannot be changed.");
+        if (!Arrays.asList("PENDING", "EDIT_ALLOWED").contains(user.getProfileVerificationStatus())) {
+            throw new IllegalStateException("Profile cannot be submitted in its current state: " + user.getProfileVerificationStatus());
+        }
+        if ("EDIT_ALLOWED".equals(user.getProfileVerificationStatus())) {
+            List<Document> oldDocs = documentRepository.findByUserId(user.getId());
+            for (Document doc : oldDocs) {
+                try {
+                    Files.deleteIfExists(Paths.get(doc.getFilePath()));
+                } catch (IOException e) {
+                    System.err.println("Could not delete old file: " + doc.getFilePath());
+                }
+            }
+            documentRepository.deleteAll(oldDocs);
         }
 
         user.setDob(LocalDate.parse(profileDTO.getDob()));
@@ -128,8 +144,6 @@ public class ProfileService {
         }
     }
 
-    // --- NEW METHODS FOR HR VERIFICATION ---
-
     @Transactional(readOnly = true)
     public List<ProfileReviewDTO> getProfilesForVerification() {
         List<String> statuses = Arrays.asList("SUBMITTED", "VERIFIED", "REJECTED");
@@ -163,12 +177,11 @@ public class ProfileService {
         dto.setIsFresher(user.getIsFresher());
         dto.setProfileVerificationStatus(user.getProfileVerificationStatus());
 
-        // --- THIS IS THE CORRECTED LINE ---
         dto.setDocuments(documents.stream().map(doc -> new DocumentDTO(
                 doc.getDocumentType(),
                 doc.getCustomDocumentName(),
                 java.nio.file.Paths.get(doc.getFilePath()).getFileName().toString(),
-                doc.getIsPreviousCompany() // <-- Add this 4th argument
+                doc.getIsPreviousCompany()
         )).collect(Collectors.toList()));
 
         return dto;
@@ -188,16 +201,83 @@ public class ProfileService {
     }
 
     @Transactional
-    public void rejectProfile(Long userId) {
+    public void rejectProfile(Long userId, String reason) {
+        // Find the user
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found with ID: " + userId));
 
+        // Check current status
         if (!"SUBMITTED".equals(user.getProfileVerificationStatus())) {
-            throw new IllegalStateException("Profile can only be rejected if the status is SUBMITTED.");
+            throw new IllegalStateException("Profile can only be rejected if its status is SUBMITTED.");
         }
 
+        // Find all documents associated with the user
+        List<Document> documentsToDelete = documentRepository.findByUserId(userId);
 
+        // Delete the physical files from server storage
+        for (Document doc : documentsToDelete) {
+            try {
+                if (doc.getFilePath() != null && !doc.getFilePath().isEmpty()) {
+                    Files.deleteIfExists(Paths.get(doc.getFilePath()));
+                }
+            } catch (IOException e) {
+                System.err.println("Failed to delete physical file: " + doc.getFilePath());
+                e.printStackTrace();
+            }
+        }
+
+        // Delete the document records from the database
+        if (!documentsToDelete.isEmpty()) {
+            documentRepository.deleteAll(documentsToDelete);
+        }
+
+        // Update user's status to PENDING so they can resubmit
         user.setProfileVerificationStatus("PENDING");
         userRepository.save(user);
+
+        // --- CHANGE 2: CALL THE METHOD ON THE INJECTED INSTANCE (emailService) ---
+        emailService.sendProfileRejectionEmail(user.getEmail(), user.getFullName(), reason);
+    }
+    @Transactional
+    public void requestProfileUpdate(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("User not found."));
+
+        if (!"VERIFIED".equals(user.getProfileVerificationStatus())) {
+            throw new IllegalStateException("You can only request an update for a VERIFIED profile.");
+        }
+
+        user.setProfileVerificationStatus("EDIT_REQUESTED");
+        userRepository.save(user);
+
+        // Optional: Notify HR via email that a request has been made.
+    }
+    @Transactional(readOnly = true)
+    public List<ProfileReviewDTO> getProfileUpdateRequests() {
+        // --- CHANGE HERE: Use the correct status name ---
+        return userRepository.findByProfileVerificationStatus("EDIT_REQUESTED")
+                .stream()
+                .map(user -> new ProfileReviewDTO(
+                        user.getId(),
+                        user.getEmployeeId(),
+                        user.getFullName(),
+                        user.getProfileVerificationStatus()
+                ))
+                .collect(Collectors.toList());
+    }
+    @Transactional
+    public void allowProfileUpdate(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found."));
+
+        if (!"EDIT_REQUESTED".equals(user.getProfileVerificationStatus())) {
+            throw new IllegalStateException("User has not requested a profile update.");
+        }
+
+        user.setProfileVerificationStatus("EDIT_ALLOWED");
+        userRepository.save(user);
+
+        // Notify the employee that their form is unlocked
+        emailService.sendProfileUpdateAllowedEmail(user.getEmail(), user.getFullName());
     }
 }

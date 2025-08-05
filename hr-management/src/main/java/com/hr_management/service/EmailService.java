@@ -79,4 +79,42 @@ public class EmailService {
         message.setFrom(fromEmail);
         mailSender.send(message);
     }
+    public void sendProfileRejectionEmail(String toEmail, String fullName, String reason) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(toEmail);
+        message.setSubject("BISAG-N HR System - Action Required on Your Profile Submission");
+        message.setText("Dear " + fullName + ",\n\n" +
+                "Your recent profile submission has been reviewed but could not be approved at this time. All previously uploaded documents have been removed from the system.\n\n" +
+                "Reason for rejection: " + reason + "\n\n" +
+                "Please log in to the portal to correct your information and re-upload the necessary documents.\n" +
+                "Portal Link: " + frontendUrl + "\n\n" +
+                "Best regards,\nBISAG-N Team");
+        message.setFrom(fromEmail);
+        mailSender.send(message);
+    }
+    public void sendProfileUpdateAllowedEmail(String toEmail, String fullName) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(toEmail);
+        message.setSubject("BISAG-N HR System - Your Profile Update Request was Approved");
+        message.setText("Dear " + fullName + ",\n\n" +
+                "Your request to update your profile has been approved by HR.\n" +
+                "Your profile form is now unlocked. Please log in to the portal to make your changes and resubmit for verification.\n\n" +
+                "Portal Link: " + frontendUrl + "\n\n" +
+                "Best regards,\nBISAG-N Team");
+        message.setFrom(fromEmail);
+        mailSender.send(message);
+    }
+
+    public void sendReportingPersonChangeEmail(String toEmail, String employeeFullName, String newManagerFullName) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(toEmail);
+        message.setSubject("Important: Update to Your Reporting Structure");
+        message.setText("Dear " + employeeFullName + ",\n\n" +
+                "This is to inform you that there has been an update to your reporting structure within the BISAG-N HR Management System.\n\n" +
+                "Your new reporting person is now: " + newManagerFullName + "\n\n" +
+                "This change has been made by the HR department and is effective immediately. No action is required from your side.\n\n" +
+                "Best regards,\nBISAG-N Team");
+        message.setFrom(fromEmail);
+        mailSender.send(message);
+    }
 }

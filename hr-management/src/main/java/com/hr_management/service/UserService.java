@@ -103,6 +103,38 @@ public class UserService implements UserDetailsService {
     public List<User> getHods() {
         return userRepository.findByRole("HOD");
     }
+    public List<UserDTO> getAllUsersSimple() {
+        logger.info("Fetching a simple list of all users.");
+        return userRepository.findAll().stream()
+                .map(user -> {
+                    UserDTO dto = new UserDTO();
+                    dto.setId(user.getId());
+                    dto.setFullName(user.getFullName());
+                    dto.setEmployeeId(user.getEmployeeId());
+                    return dto;
+                })
+                .collect(Collectors.toList());
+    }
+    public void changeReportingPerson(Long userId, Long newReportingToId) {
+        logger.info("Attempting to change reporting person for user ID: {} to new manager ID: {}", userId, newReportingToId);
+
+        if (userId.equals(newReportingToId)) {
+            throw new IllegalStateException("An employee cannot report to themselves.");
+        }
+
+        User employee = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Employee not found with ID: " + userId));
+
+        User newManager = userRepository.findById(newReportingToId)
+                .orElseThrow(() -> new IllegalArgumentException("New reporting person (manager) not found with ID: " + newReportingToId));
+
+        employee.setReportingTo(newManager);
+        userRepository.save(employee);
+
+        logger.info("Successfully changed reporting person for user: {} to: {}", employee.getUsername(), newManager.getUsername());
+        // Optionally, send an email notification about the change
+        emailService.sendReportingPersonChangeEmail(employee.getEmail(), employee.getFullName(), newManager.getFullName());
+    }
 
     public void updateUserStatus(Long id, String newStatus) {
         if (!newStatus.equals("ACTIVE") && !newStatus.equals("INACTIVE")) {

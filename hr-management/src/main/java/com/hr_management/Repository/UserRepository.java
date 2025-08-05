@@ -37,6 +37,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     List<User> findByStatus(String status);
 
-    // New Method
     List<User> findByProfileVerificationStatusIn(List<String> statuses);
+
+    // --- ADD THIS NEW METHOD ---
+    List<User> findByProfileVerificationStatus(String status);
 }
