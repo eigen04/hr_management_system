@@ -52,6 +52,20 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Collections.emptyList());
         }
     }
+    // Paste this new method inside your UserController.java class
+
+    @GetMapping("/users/directory")
+    @PreAuthorize("hasRole('HR')")
+    public ResponseEntity<List<UserDTO>> getAllUsersForDirectory() {
+        logger.info("Received request for /api/users/directory");
+        try {
+            List<UserDTO> users = userService.getAllUsersForDirectory();
+            return ResponseEntity.ok(users);
+        } catch (Exception e) {
+            logger.error("Error fetching users for directory: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
     // --- The method below is the one we are fixing ---
     @GetMapping("/users/me")
     public ResponseEntity<?> getCurrentUser() {

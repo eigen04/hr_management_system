@@ -135,7 +135,40 @@ public class UserService implements UserDetailsService {
         // Optionally, send an email notification about the change
         emailService.sendReportingPersonChangeEmail(employee.getEmail(), employee.getFullName(), newManager.getFullName());
     }
+    // Paste these two new methods inside your UserService.java class
 
+    public List<UserDTO> getAllUsersForDirectory() {
+        logger.info("Fetching a detailed list of all users for the HR directory.");
+        List<User> users = userRepository.findAll();
+        return users.stream()
+                .map(this::mapUserToFullUserDTO)
+                .collect(Collectors.toList());
+    }
+
+    private UserDTO mapUserToFullUserDTO(User user) {
+        UserDTO dto = new UserDTO();
+        dto.setId(user.getId());
+        dto.setEmployeeId(user.getEmployeeId());
+        dto.setFullName(user.getFullName());
+        dto.setEmail(user.getEmail());
+        dto.setRole(user.getRole());
+
+        // Use the custom getter from your User entity to get department name
+        dto.setDepartment(user.getDepartment());
+
+        // --- THIS IS THE CORRECTED LINE ---
+        // Pass the LocalDate object directly. Jackson will format it to a string in the JSON.
+        dto.setJoinDate(user.getJoinDate());
+
+        // Get the name of the person they report to
+        if (user.getReportingTo() != null) {
+            dto.setReportingToName(user.getReportingTo().getFullName());
+        } else {
+            dto.setReportingToName("N/A");
+        }
+
+        return dto;
+    }
     public void updateUserStatus(Long id, String newStatus) {
         if (!newStatus.equals("ACTIVE") && !newStatus.equals("INACTIVE")) {
             throw new RuntimeException("Invalid status");

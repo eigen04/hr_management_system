@@ -1,7 +1,56 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, Clock, CheckCircle, AlertCircle, Building, Menu, X, LogOut, Download, ChevronLeft, ChevronRight, FileText, UserPlus, Calendar, UserCheck, Bell } from 'lucide-react';
+import { Users, Clock, CheckCircle, AlertCircle, Building, Menu, X, LogOut, Download, ChevronLeft, ChevronRight, FileText, UserPlus, Calendar, UserCheck, Bell, List } from 'lucide-react';
 import ExcelJS from 'exceljs';
+
+// New Reusable Pagination Component (Keep this here or move to a separate file)
+function PaginationControls({ currentPage, totalItems, itemsPerPage, onPageChange }) {
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+
+  if (totalPages <= 1) {
+    return null; // Don't show pagination if there's only one page
+  }
+
+  const handlePrev = () => {
+    if (currentPage > 1) {
+      onPageChange(currentPage - 1);
+    }
+  };
+
+  const handleNext = () => {
+    if (currentPage < totalPages) {
+      onPageChange(currentPage + 1);
+    }
+  };
+
+  return (
+      <div className="flex items-center justify-between mt-4 px-4 py-2 bg-gray-50 border-t">
+        <div className="text-sm text-gray-700">
+          Showing <span className="font-semibold">{Math.min((currentPage - 1) * itemsPerPage + 1, totalItems)}</span> to <span className="font-semibold">{Math.min(currentPage * itemsPerPage, totalItems)}</span> of <span className="font-semibold">{totalItems}</span> results
+        </div>
+        <div className="flex items-center space-x-2">
+         <span className="text-sm text-gray-700">
+            Page <span className="font-semibold">{currentPage}</span> of <span className="font-semibold">{totalPages}</span>
+        </span>
+          <button
+              onClick={handlePrev}
+              disabled={currentPage === 1}
+              className="px-3 py-1 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Previous
+          </button>
+          <button
+              onClick={handleNext}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+  );
+}
+
 
 export default function HRDashboard() {
   const navigate = useNavigate();
@@ -41,8 +90,27 @@ export default function HRDashboard() {
   const [selectedEmployeeForReportingChange, setSelectedEmployeeForReportingChange] = useState(null);
   const [newReportingToId, setNewReportingToId] = useState('');
 
+  // State for Employee Directory filters
+  const [directorySearchTerm, setDirectorySearchTerm] = useState('');
+  const [directoryFilterDept, setDirectoryFilterDept] = useState('');
+  const [directoryFilterRole, setDirectoryFilterRole] = useState('');
+  const [directoryFilterJoinDateFrom, setDirectoryFilterJoinDateFrom] = useState('');
+  const [directoryFilterJoinDateTo, setDirectoryFilterJoinDateTo] = useState('');
+
+
+  // State for Pagination
+  const ITEMS_PER_PAGE = 10;
+  const [directoryCurrentPage, setDirectoryCurrentPage] = useState(1);
+  const [pendingSignupsPage, setPendingSignupsPage] = useState(1);
+  const [profileVerificationPage, setProfileVerificationPage] = useState(1);
+  const [updateRequestsPage, setUpdateRequestsPage] = useState(1);
+  const [holidaysPage, setHolidaysPage] = useState(1);
+  const [departmentEmployeesPage, setDepartmentEmployeesPage] = useState(1);
+
+  const [profileVerificationSearchTerm, setProfileVerificationSearchTerm] = useState('');
+  const [profileVerificationFilterStatus, setProfileVerificationFilterStatus] = useState('SUBMITTED');
   // ===================================================================================
-  // ALL DATA FETCHING FUNCTIONS MOVED HERE & WRAPPED IN useCallback
+  // ALL DATA FETCHING FUNCTIONS - UNCHANGED
   // ===================================================================================
 
   const fetchUpdateRequests = useCallback(async (token) => {
@@ -153,18 +221,30 @@ export default function HRDashboard() {
 
   const fetchAllEmployees = useCallback(async (token) => {
     try {
-      const response = await fetch('http://localhost:8081/api/users/all', {
+      setIsLoading(true);
+      const response = await fetch('http://localhost:8081/api/users/directory', {
         headers: { 'Authorization': `Bearer ${token}` },
       });
-      if (response.ok) setAllEmployeesList(await response.json());
-      else console.error('Failed to fetch all employees list.');
+      if (response.ok) {
+        const data = await response.json();
+        const employeesWithReportingNames = data.map(e => ({
+          ...e,
+          reportingToName: e.reportingToName || 'N/A'
+        }));
+        setAllEmployeesList(employeesWithReportingNames);
+      } else {
+        console.error('Failed to fetch all employees list.');
+      }
     } catch (error) {
       console.error('Error fetching all employees:', error);
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
+
   // ===================================================================================
-  // UseEffect for initial data load and view changes
+  // UseEffect Hooks - UNCHANGED
   // ===================================================================================
   useEffect(() => {
     const token = localStorage.getItem('authToken');
@@ -206,17 +286,24 @@ export default function HRDashboard() {
     };
 
     fetchUserData();
-    fetchAllEmployees(token); // Fetch all employees for dropdowns initially
+
+    // Initial data fetch that is common for many views
+    fetchRoles(token);
+    fetchDepartmentData(token);
+    fetchAllEmployees(token);
+    fetchHolidays(token);
 
     switch (activeView) {
       case 'dashboard':
         fetchDashboardData(token);
-        fetchRoles(token);
-        fetchDepartmentData(token);
         break;
       case 'department-overview':
-        fetchDepartmentData(token);
+        // Data already fetched
         break;
+      case 'employee-directory':
+        // Data already fetched
+        break;
+
       case 'holidays':
         fetchHolidays(token);
         break;
@@ -232,11 +319,8 @@ export default function HRDashboard() {
       default:
         break;
     }
-  }, [navigate, activeView, fetchDashboardData, fetchRoles, fetchDepartmentData, fetchHolidays, fetchPendingSignups, fetchProfilesForVerification, fetchUpdateRequests, fetchAllEmployees]);
+  }, [navigate, activeView, fetchDashboardData, fetchHolidays, fetchPendingSignups, fetchProfilesForVerification, fetchUpdateRequests, fetchAllEmployees, fetchDepartmentData, fetchRoles]);
 
-  // ===================================================================================
-  // UseEffect for notification polling - THIS WILL NOW WORK
-  // ===================================================================================
   useEffect(() => {
     const token = localStorage.getItem('authToken');
     if (!token) return;
@@ -260,16 +344,16 @@ export default function HRDashboard() {
 
   }, [fetchPendingSignups, fetchProfilesForVerification, fetchUpdateRequests]);
 
-  // ===================================================================================
-  // All other component logic and JSX remains the same
-  // ===================================================================================
-
   useEffect(() => {
     if (notification.message) {
       const timer = setTimeout(() => setNotification({ message: '', type: '' }), 5000);
       return () => clearTimeout(timer);
     }
   }, [notification]);
+
+  // ===================================================================================
+  // Component Logic and Handlers - UNCHANGED
+  // ===================================================================================
 
   const openReportingModal = (employee) => {
     setSelectedEmployeeForReportingChange(employee);
@@ -307,6 +391,7 @@ export default function HRDashboard() {
         if (selectedDepartment) {
           fetchEmployeesInDepartment(selectedDepartment);
         }
+        fetchAllEmployees(token); // Refresh the main employee list
         closeReportingModal();
       } else {
         const data = await response.json();
@@ -319,8 +404,6 @@ export default function HRDashboard() {
     }
   };
 
-  // ... (Paste the rest of your component's functions and JSX here, starting from `isNonHoliday`)
-  // No changes are needed for the functions below this point.
   const isNonHoliday = (dateStr) => {
     if (!dateStr || typeof dateStr !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
       return false;
@@ -343,6 +426,7 @@ export default function HRDashboard() {
       if (response.ok) {
         setPendingSignups(prev => prev.filter(user => user.id !== userId));
         setNotification({ message: 'User approved and added to the system successfully.', type: 'success' });
+        fetchAllEmployees(token); // Refresh employee list
       } else {
         const data = await response.json().catch(() => ({}));
         setNotification({ message: `Failed to approve user: ${data.message || 'Unknown error'}`, type: 'error' });
@@ -723,6 +807,7 @@ export default function HRDashboard() {
     setSelectedDepartment(deptId);
     setSelectedEmployee(null);
     setActiveView(null);
+    setDepartmentEmployeesPage(1); // Reset page on new selection
     fetchEmployeesInDepartment(deptId);
   };
 
@@ -902,10 +987,217 @@ export default function HRDashboard() {
 
     return calendarDays;
   };
+
+  const handleAllowUpdate = async (userId) => {
+    if (!window.confirm('Are you sure you want to allow this user to update their profile? They will be notified by email.')) {
+      return;
+    }
+    const token = localStorage.getItem('authToken');
+    try {
+      setIsLoading(true);
+      const response = await fetch(`http://localhost:8081/api/hr/profiles/${userId}/allow-edit`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        setNotification({ message: 'User has been notified and their profile is unlocked for editing.', type: 'success' });
+        setUpdateRequests(prev => prev.filter(req => req.userId !== userId));
+      } else {
+        const data = await response.json();
+        setNotification({ message: `Failed to allow update: ${data.message || 'Unknown error'}`, type: 'error' });
+      }
+    } catch (error) {
+      setNotification({ message: 'An error occurred while allowing the update.', type: 'error' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleViewDocument = async (fileName) => {
+    const token = localStorage.getItem('authToken');
+    try {
+      const response = await fetch(`http://localhost:8081/api/documents/view/${fileName}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        throw new Error('Could not download file.');
+      }
+
+      const blob = await response.blob();
+      const fileUrl = window.URL.createObjectURL(blob);
+      window.open(fileUrl, '_blank');
+
+    } catch (error) {
+      setNotification({ message: 'Failed to open document.', type: 'error' });
+    }
+  };
+
+  const handleDownloadDocument = async (fileName) => {
+    const token = localStorage.getItem('authToken');
+    try {
+      setIsLoading(true);
+      const response = await fetch(`http://localhost:8081/api/documents/view/${fileName}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        throw new Error('Could not download file.');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      setNotification({ message: 'Document downloaded successfully.', type: 'success' });
+
+    } catch (error){
+      setNotification({ message: 'Failed to download document.', type: 'error' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+
+  // ===================================================================================
+  // RENDER FUNCTIONS - MODIFIED WITH PAGINATION & NEW FILTERS
+  // ===================================================================================
+
+  const renderEmployeeDirectory = () => {
+    const filteredEmployees = allEmployeesList.filter(emp => {
+      const normalizedSearch = directorySearchTerm.toLowerCase();
+      const matchesSearch = emp.fullName.toLowerCase().includes(normalizedSearch) ||
+          (emp.employeeId && emp.employeeId.toLowerCase().includes(normalizedSearch));
+
+      const matchesDept = directoryFilterDept ? emp.department === directoryFilterDept : true;
+      const matchesRole = directoryFilterRole ? emp.role === directoryFilterRole : true;
+
+      // Date range filtering logic
+      let matchesDate = true;
+      if (directoryFilterJoinDateFrom && emp.joinDate) {
+        try {
+          matchesDate = matchesDate && new Date(emp.joinDate) >= new Date(directoryFilterJoinDateFrom);
+        } catch (e) { /* ignore invalid date */ }
+      }
+      if (directoryFilterJoinDateTo && emp.joinDate) {
+        try {
+          matchesDate = matchesDate && new Date(emp.joinDate) <= new Date(directoryFilterJoinDateTo);
+        } catch(e) { /* ignore invalid date */ }
+      }
+
+      return matchesSearch && matchesDept && matchesRole && matchesDate;
+    });
+
+    // Pagination Logic
+    const paginatedEmployees = filteredEmployees.slice(
+        (directoryCurrentPage - 1) * ITEMS_PER_PAGE,
+        directoryCurrentPage * ITEMS_PER_PAGE
+    );
+
+    return (
+        <div className="space-y-6">
+          <h2 className="text-2xl font-semibold text-gray-900">Employee Directory</h2>
+
+          <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <input
+                  type="text"
+                  placeholder="Search by Name or ID..."
+                  value={directorySearchTerm}
+                  onChange={e => { setDirectorySearchTerm(e.target.value); setDirectoryCurrentPage(1); }}
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              />
+              <select
+                  value={directoryFilterDept}
+                  onChange={e => { setDirectoryFilterDept(e.target.value); setDirectoryCurrentPage(1); }}
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              >
+                <option value="">All Departments</option>
+                {departmentData.map(dept => <option key={dept.id} value={dept.name}>{dept.name}</option>)}
+              </select>
+              <select
+                  value={directoryFilterRole}
+                  onChange={e => { setDirectoryFilterRole(e.target.value); setDirectoryCurrentPage(1); }}
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              >
+                <option value="">All Roles</option>
+                {roles.map(role => <option key={role.id} value={role.name}>{role.name}</option>)}
+              </select>
+              <div className="relative">
+                <label className="text-xs text-gray-500 absolute -top-2 left-2 bg-white px-1">Join Date From</label>
+                <input
+                    type="date"
+                    value={directoryFilterJoinDateFrom}
+                    onChange={e => { setDirectoryFilterJoinDateFrom(e.target.value); setDirectoryCurrentPage(1); }}
+                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 pt-2"
+                />
+              </div>
+              <div className="relative">
+                <label className="text-xs text-gray-500 absolute -top-2 left-2 bg-white px-1">Join Date To</label>
+                <input
+                    type="date"
+                    value={directoryFilterJoinDateTo}
+                    onChange={e => { setDirectoryFilterJoinDateTo(e.target.value); setDirectoryCurrentPage(1); }}
+                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 pt-2"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                <tr>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee ID</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reporting To</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Join Date</th>
+                </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200 text-sm">
+                {paginatedEmployees.length > 0 ? paginatedEmployees.map(emp => (
+                    <tr key={emp.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-4 text-gray-700 break-words">{emp.employeeId || 'N/A'}</td>
+                      <td className="px-4 py-4 font-medium text-gray-900 break-words">{emp.fullName || 'N/A'}</td>
+                      <td className="px-4 py-4 text-gray-700 max-w-xs" title={emp.email || ''}>
+                        <div className="truncate">{emp.email || 'N/A'}</div>
+                      </td>
+                      <td className="px-4 py-4 text-gray-700 break-words">{emp.department || 'N/A'}</td>
+                      <td className="px-4 py-4 text-gray-700 break-words">{emp.role || 'N/A'}</td>
+                      <td className="px-4 py-4 text-gray-700 break-words">{emp.reportingToName || 'N/A'}</td>
+                      <td className="px-4 py-4 text-gray-700 whitespace-nowrap">{emp.joinDate || 'N/A'}</td>
+                    </tr>
+                )) : (
+                    <tr>
+                      <td colSpan="7" className="text-center py-10 text-gray-500">No employees found matching your criteria.</td>
+                    </tr>
+                )}
+                </tbody>
+              </table>
+            </div>
+            <PaginationControls
+                currentPage={directoryCurrentPage}
+                totalItems={filteredEmployees.length}
+                itemsPerPage={ITEMS_PER_PAGE}
+                onPageChange={setDirectoryCurrentPage}
+            />
+          </div>
+        </div>
+    );
+  };
+
   const renderProfileDetailView = () => {
     if (!selectedProfile) return null;
-
-    const { userDetails, documents } = selectedProfile;
 
     return (
         <div className="space-y-6">
@@ -988,9 +1280,58 @@ export default function HRDashboard() {
   };
 
   const renderProfileVerificationList = () => {
+    // Filter logic is now at the top
+    const filteredProfiles = profileVerificationList.filter(profile => {
+      // Filter by status from the dropdown
+      const matchesStatus = profileVerificationFilterStatus === 'ALL' || profile.profileVerificationStatus === profileVerificationFilterStatus;
+
+      // Filter by search term from the input box
+      const normalizedSearch = profileVerificationSearchTerm.toLowerCase();
+      const matchesSearch = !profileVerificationSearchTerm ||
+          profile.fullName.toLowerCase().includes(normalizedSearch) ||
+          (profile.employeeId && profile.employeeId.toLowerCase().includes(normalizedSearch));
+
+      return matchesStatus && matchesSearch;
+    });
+
+    const paginatedProfiles = filteredProfiles.slice(
+        (profileVerificationPage - 1) * ITEMS_PER_PAGE,
+        profileVerificationPage * ITEMS_PER_PAGE
+    );
+
     return (
         <div className="space-y-6">
           <h2 className="text-2xl font-semibold text-gray-900">Profile Verification Requests</h2>
+
+          {/* ++ NEW: Search and Filter controls ++ */}
+          <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input
+                  type="text"
+                  placeholder="Search by Name or Employee ID..."
+                  value={profileVerificationSearchTerm}
+                  onChange={e => {
+                    setProfileVerificationSearchTerm(e.target.value);
+                    setProfileVerificationPage(1); // Reset to first page on search
+                  }}
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              />
+              <select
+                  value={profileVerificationFilterStatus}
+                  onChange={e => {
+                    setProfileVerificationFilterStatus(e.target.value);
+                    setProfileVerificationPage(1); // Reset to first page on filter change
+                  }}
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              >
+                <option value="SUBMITTED">Pending Verification</option>
+                <option value="VERIFIED">Verified</option>
+                <option value="ALL">Show All</option>
+              </select>
+            </div>
+          </div>
+
+
           {profileVerificationList.length === 0 && !isLoading ? (
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
                 <p className="text-sm text-gray-700">No profiles are currently pending verification.</p>
@@ -1008,7 +1349,7 @@ export default function HRDashboard() {
                     </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                    {profileVerificationList.map(profile => (
+                    {paginatedProfiles.length > 0 ? paginatedProfiles.map(profile => (
                         <tr key={profile.userId} className="hover:bg-gray-50 transition duration-150">
                           <td className="px-6 py-4 whitespace-nowrap text-gray-900">{profile.employeeId}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-gray-900">{profile.fullName}</td>
@@ -1030,42 +1371,33 @@ export default function HRDashboard() {
                             </button>
                           </td>
                         </tr>
-                    ))}
+                    )) : (
+                        <tr>
+                          <td colSpan="4" className="text-center py-10 text-gray-500">
+                            No profiles found matching your criteria.
+                          </td>
+                        </tr>
+                    )}
                     </tbody>
                   </table>
                 </div>
+                <PaginationControls
+                    currentPage={profileVerificationPage}
+                    totalItems={filteredProfiles.length}
+                    itemsPerPage={ITEMS_PER_PAGE}
+                    onPageChange={setProfileVerificationPage}
+                />
               </div>
           )}
         </div>
     );
   };
-  const handleAllowUpdate = async (userId) => {
-    if (!window.confirm('Are you sure you want to allow this user to update their profile? They will be notified by email.')) {
-      return;
-    }
-    const token = localStorage.getItem('authToken');
-    try {
-      setIsLoading(true);
-      const response = await fetch(`http://localhost:8081/api/hr/profiles/${userId}/allow-edit`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-
-      if (response.ok) {
-        setNotification({ message: 'User has been notified and their profile is unlocked for editing.', type: 'success' });
-        setUpdateRequests(prev => prev.filter(req => req.userId !== userId));
-      } else {
-        const data = await response.json();
-        setNotification({ message: `Failed to allow update: ${data.message || 'Unknown error'}`, type: 'error' });
-      }
-    } catch (error) {
-      setNotification({ message: 'An error occurred while allowing the update.', type: 'error' });
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const renderUpdateRequests = () => {
+    const paginatedRequests = updateRequests.slice(
+        (updateRequestsPage - 1) * ITEMS_PER_PAGE,
+        updateRequestsPage * ITEMS_PER_PAGE
+    );
     return (
         <div className="space-y-6">
           <h2 className="text-2xl font-semibold text-gray-900">Profile Update Requests</h2>
@@ -1085,7 +1417,7 @@ export default function HRDashboard() {
                     </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                    {updateRequests.map(req => (
+                    {paginatedRequests.map(req => (
                         <tr key={req.userId} className="hover:bg-gray-50 transition duration-150">
                           <td className="px-6 py-4 whitespace-nowrap text-gray-900">{req.employeeId}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-gray-900">{req.fullName}</td>
@@ -1103,31 +1435,18 @@ export default function HRDashboard() {
                     </tbody>
                   </table>
                 </div>
+                <PaginationControls
+                    currentPage={updateRequestsPage}
+                    totalItems={updateRequests.length}
+                    itemsPerPage={ITEMS_PER_PAGE}
+                    onPageChange={setUpdateRequestsPage}
+                />
               </div>
           )}
         </div>
     );
   };
 
-  const handleViewDocument = async (fileName) => {
-    const token = localStorage.getItem('authToken');
-    try {
-      const response = await fetch(`http://localhost:8081/api/documents/view/${fileName}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-
-      if (!response.ok) {
-        throw new Error('Could not download file.');
-      }
-
-      const blob = await response.blob();
-      const fileUrl = window.URL.createObjectURL(blob);
-      window.open(fileUrl, '_blank');
-
-    } catch (error) {
-      setNotification({ message: 'Failed to open document.', type: 'error' });
-    }
-  };
   const renderLeaveCalendar = () => {
     const calendarDays = generateCalendarDays();
     const monthName = currentMonth.toLocaleString('default', { month: 'long' });
@@ -1237,6 +1556,11 @@ export default function HRDashboard() {
       return new Date(a.date) - new Date(b.date);
     });
 
+    const paginatedHolidays = sortedHolidays.slice(
+        (holidaysPage - 1) * ITEMS_PER_PAGE,
+        holidaysPage * ITEMS_PER_PAGE
+    );
+
     return (
         <div className="space-y-6">
           <div className="flex justify-between items-center">
@@ -1266,7 +1590,7 @@ export default function HRDashboard() {
                     </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                    {sortedHolidays.map(holiday => (
+                    {paginatedHolidays.map(holiday => (
                         <tr key={holiday.id} className="hover:bg-gray-50 transition duration-150">
                           <td className="px-6 py-4 whitespace-nowrap text-gray-900">{holiday.name}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-gray-600">{holiday.date}</td>
@@ -1285,39 +1609,16 @@ export default function HRDashboard() {
                     </tbody>
                   </table>
                 </div>
+                <PaginationControls
+                    currentPage={holidaysPage}
+                    totalItems={sortedHolidays.length}
+                    itemsPerPage={ITEMS_PER_PAGE}
+                    onPageChange={setHolidaysPage}
+                />
               </div>
           )}
         </div>
     );
-  };
-  const handleDownloadDocument = async (fileName) => {
-    const token = localStorage.getItem('authToken');
-    try {
-      setIsLoading(true);
-      const response = await fetch(`http://localhost:8081/api/documents/view/${fileName}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-
-      if (!response.ok) {
-        throw new Error('Could not download file.');
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-      setNotification({ message: 'Document downloaded successfully.', type: 'success' });
-
-    } catch (error){
-      setNotification({ message: 'Failed to download document.', type: 'error' });
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   const renderPendingSignups = () => {
@@ -1347,6 +1648,11 @@ export default function HRDashboard() {
       }
     };
 
+    const paginatedSignups = pendingSignups.slice(
+        (pendingSignupsPage - 1) * ITEMS_PER_PAGE,
+        pendingSignupsPage * ITEMS_PER_PAGE
+    );
+
     if (pendingSignups.length === 0 && !isLoading) {
       return (
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
@@ -1356,61 +1662,69 @@ export default function HRDashboard() {
     }
 
     return (
-        <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-x-auto max-w-full">
-          <table className="w-full divide-y divide-gray-200 table-fixed">
-            <thead className="bg-gray-50">
-            <tr>
-              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[6%] min-w-[40px]">ID</th>
-              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[10%] min-w-[80px]">Name</th>
-              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[10%] min-w-[70px]">Role</th>
-              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[14%] min-w-[90px]">Department</th>
-              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[10%] min-w-[60px]">Gender</th>
-              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[14%] min-w-[90px]">Reporting To</th>
-              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[12%] min-w-[80px]">Join Date</th>
-              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[10%] min-w-[60px]">Status</th>
-              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[18%] min-w-[140px]">Actions</th>
-            </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-            {pendingSignups.map(user => (
-                <tr key={user.id} className="hover:bg-gray-50 transition duration-150">
-                  <td className="px-3 py-2 whitespace-nowrap text-gray-900 text-xs">{user.employeeId}</td>
-                  <td className="px-3 py-2 text-gray-900 truncate text-xs">{user.fullName}</td>
-                  <td className="px-3 py-2 text-gray-600 text-xs">{user.role}</td>
-                  <td className="px-3 py-2 text-gray-600 text-xs">{user.department || 'N/A'}</td>
-                  <td className="px-3 py-2 text-gray-600 text-xs">{user.gender || 'N/A'}</td>
-                  <td className="px-3 py-2 text-gray-600 truncate text-xs">{user.reportingToName || 'N/A'}</td>
-                  <td className="px-3 py-2 text-gray-600 text-xs">{user.joinDate || 'N/A'}</td>
-                  <td className="px-3 py-2 text-gray-600 text-xs">{user.status}</td>
-                  <td className="px-3 py-2">
-                    <div className="flex space-x-1 flex-nowrap">
-                      <button
-                          onClick={() => handleApproveSignup(user.id)}
-                          className="bg-green-600 text-white px-2 py-1 rounded-md hover:bg-green-700 transition duration-200 text-xs whitespace-nowrap"
-                          disabled={isLoading}
-                      >
-                        Approve
-                      </button>
-                      <button
-                          onClick={() => setDisapproveModal({ open: true, userId: user.id, reason: '' })}
-                          className="bg-red-600 text-white px-2 py-1 rounded-md hover:bg-red-700 transition duration-200 text-xs whitespace-nowrap"
-                          disabled={isLoading}
-                      >
-                        Disapprove
-                      </button>
-                      <button
-                          onClick={() => handleDeleteSignup(user.id)}
-                          className="bg-gray-600 text-white px-2 py-1 rounded-md hover:bg-gray-700 transition duration-200 text-xs whitespace-nowrap"
-                          disabled={isLoading}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-            ))}
-            </tbody>
-          </table>
+        <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto max-w-full">
+            <table className="w-full divide-y divide-gray-200 table-fixed">
+              <thead className="bg-gray-50">
+              <tr>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[6%] min-w-[40px]">ID</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[10%] min-w-[80px]">Name</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[10%] min-w-[70px]">Role</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[14%] min-w-[90px]">Department</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[10%] min-w-[60px]">Gender</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[14%] min-w-[90px]">Reporting To</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[12%] min-w-[80px]">Join Date</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[10%] min-w-[60px]">Status</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[18%] min-w-[140px]">Actions</th>
+              </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+              {paginatedSignups.map(user => (
+                  <tr key={user.id} className="hover:bg-gray-50 transition duration-150">
+                    <td className="px-3 py-2 whitespace-nowrap text-gray-900 text-xs">{user.employeeId}</td>
+                    <td className="px-3 py-2 text-gray-900 truncate text-xs">{user.fullName}</td>
+                    <td className="px-3 py-2 text-gray-600 text-xs">{user.role}</td>
+                    <td className="px-3 py-2 text-gray-600 text-xs">{user.department || 'N/A'}</td>
+                    <td className="px-3 py-2 text-gray-600 text-xs">{user.gender || 'N/A'}</td>
+                    <td className="px-3 py-2 text-gray-600 truncate text-xs">{user.reportingToName || 'N/A'}</td>
+                    <td className="px-3 py-2 text-gray-600 text-xs">{user.joinDate || 'N/A'}</td>
+                    <td className="px-3 py-2 text-gray-600 text-xs">{user.status}</td>
+                    <td className="px-3 py-2">
+                      <div className="flex space-x-1 flex-nowrap">
+                        <button
+                            onClick={() => handleApproveSignup(user.id)}
+                            className="bg-green-600 text-white px-2 py-1 rounded-md hover:bg-green-700 transition duration-200 text-xs whitespace-nowrap"
+                            disabled={isLoading}
+                        >
+                          Approve
+                        </button>
+                        <button
+                            onClick={() => setDisapproveModal({ open: true, userId: user.id, reason: '' })}
+                            className="bg-red-600 text-white px-2 py-1 rounded-md hover:bg-red-700 transition duration-200 text-xs whitespace-nowrap"
+                            disabled={isLoading}
+                        >
+                          Disapprove
+                        </button>
+                        <button
+                            onClick={() => handleDeleteSignup(user.id)}
+                            className="bg-gray-600 text-white px-2 py-1 rounded-md hover:bg-gray-700 transition duration-200 text-xs whitespace-nowrap"
+                            disabled={isLoading}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+              ))}
+              </tbody>
+            </table>
+          </div>
+          <PaginationControls
+              currentPage={pendingSignupsPage}
+              totalItems={pendingSignups.length}
+              itemsPerPage={ITEMS_PER_PAGE}
+              onPageChange={setPendingSignupsPage}
+          />
         </div>
     );
   };
@@ -1424,6 +1738,10 @@ export default function HRDashboard() {
           </div>
       );
     }
+    const paginatedEmployees = employeesInDepartment.slice(
+        (departmentEmployeesPage - 1) * ITEMS_PER_PAGE,
+        departmentEmployeesPage * ITEMS_PER_PAGE
+    );
     return (
         <div className="space-y-6">
           <div className="flex justify-between items-center">
@@ -1482,7 +1800,7 @@ export default function HRDashboard() {
                     </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                    {employeesInDepartment.map(employee => (
+                    {paginatedEmployees.map(employee => (
                         <tr key={employee.id} className="hover:bg-gray-50 transition duration-150">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="font-medium text-gray-900">{employee.name}</div>
@@ -1513,6 +1831,12 @@ export default function HRDashboard() {
                     </tbody>
                   </table>
                 </div>
+                <PaginationControls
+                    currentPage={departmentEmployeesPage}
+                    totalItems={employeesInDepartment.length}
+                    itemsPerPage={ITEMS_PER_PAGE}
+                    onPageChange={setDepartmentEmployeesPage}
+                />
               </div>
           )}
         </div>
@@ -1683,7 +2007,7 @@ export default function HRDashboard() {
     );
   };
   const renderMainContent = () => {
-    if (isLoading) {
+    if (isLoading && activeView !== 'dashboard') {
       return (
           <div className="flex justify-center items-center h-64">
             <svg className="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -1716,6 +2040,9 @@ export default function HRDashboard() {
     if (activeView === 'department-overview') {
       return renderDepartmentOverview();
     }
+    if (activeView === 'employee-directory') {
+      return renderEmployeeDirectory();
+    }
     if (activeView === 'pending-signups') {
       return renderPendingSignups();
     }
@@ -1738,6 +2065,7 @@ export default function HRDashboard() {
   const sidebarItems = [
     { view: 'dashboard', label: 'Dashboard', icon: Users, count: 0 },
     { view: 'department-overview', label: 'Department Overview', icon: Building, count: 0 },
+    { view: 'employee-directory', label: 'Employee Directory', icon: List, count: 0 },
     { view: 'pending-signups', label: 'Pending Signup Requests', icon: FileText, count: pendingSignups.length },
     { view: 'profile-verification', label: 'Profile Verification', icon: UserCheck, count: profileVerificationList.filter(p => p.profileVerificationStatus === 'SUBMITTED').length },
     { view: 'update-requests', label: 'Profile Update Requests', icon: Bell, count: updateRequests.length },
@@ -1862,6 +2190,7 @@ export default function HRDashboard() {
                     className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
                     rows={4}
                     placeholder="Enter reason for disapproval"
+                    required
                 />
                 <div className="flex justify-end space-x-3 mt-4">
                   <button onClick={() => setDisapproveModal({ open: false, userId: null, reason: '' })} className="bg-gray-600 text-white px-4 py-2 rounded-lg">Cancel</button>
@@ -1882,6 +2211,7 @@ export default function HRDashboard() {
                     className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
                     rows={4}
                     placeholder="e.g., Aadhaar card is not legible..."
+                    required
                 />
                 <div className="flex justify-end space-x-3 mt-4">
                   <button onClick={() => setRejectionModal({ open: false, userId: null, reason: '' })} className="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg">Cancel</button>
@@ -1898,7 +2228,7 @@ export default function HRDashboard() {
                 <form onSubmit={handleAddRole}>
                   <div className="mb-6">
                     <label className="block text-sm font-medium text-gray-700 mb-2">Role Name</label>
-                    <input type="text" value={newRole} onChange={(e) => setNewRole(e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm" placeholder="e.g., Senior Developer" />
+                    <input type="text" value={newRole} onChange={(e) => setNewRole(e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm" placeholder="e.g., Senior Developer" required minLength="2" />
                   </div>
                   <div className="flex justify-end space-x-3">
                     <button type="button" onClick={() => setIsRoleModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg">Cancel</button>
@@ -1916,7 +2246,7 @@ export default function HRDashboard() {
                 <form onSubmit={handleAddDept}>
                   <div className="mb-6">
                     <label className="block text-sm font-medium text-gray-700 mb-2">Department Name</label>
-                    <input type="text" value={newDept} onChange={(e) => setNewDept(e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm" placeholder="e.g., Research & Development"/>
+                    <input type="text" value={newDept} onChange={(e) => setNewDept(e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm" placeholder="e.g., Research & Development" required minLength="2" />
                   </div>
                   <div className="flex justify-end space-x-3">
                     <button type="button" onClick={() => setIsDeptModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg">Cancel</button>
@@ -1932,8 +2262,8 @@ export default function HRDashboard() {
               <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl">
                 <h3 className="text-xl font-semibold text-gray-900 mb-6">Add New Holiday</h3>
                 <form onSubmit={handleAddHoliday}>
-                  <div className="mb-6"><label className="block text-sm font-medium text-gray-700 mb-2">Holiday Name</label><input type="text" value={newHoliday.name} onChange={(e) => setNewHoliday({ ...newHoliday, name: e.target.value })} className="block w-full rounded-md border-gray-300 shadow-sm" placeholder="e.g., Diwali"/></div>
-                  <div className="mb-6"><label className="block text-sm font-medium text-gray-700 mb-2">Date</label><input type="date" value={newHoliday.date} onChange={(e) => setNewHoliday({ ...newHoliday, date: e.target.value })} className="block w-full rounded-md border-gray-300 shadow-sm"/></div>
+                  <div className="mb-6"><label className="block text-sm font-medium text-gray-700 mb-2">Holiday Name</label><input type="text" value={newHoliday.name} onChange={(e) => setNewHoliday({ ...newHoliday, name: e.target.value })} className="block w-full rounded-md border-gray-300 shadow-sm" placeholder="e.g., Diwali" required /></div>
+                  <div className="mb-6"><label className="block text-sm font-medium text-gray-700 mb-2">Date</label><input type="date" value={newHoliday.date} onChange={(e) => setNewHoliday({ ...newHoliday, date: e.target.value })} className="block w-full rounded-md border-gray-300 shadow-sm" required /></div>
                   <div className="mb-6"><label className="block text-sm font-medium text-gray-700 mb-2">Type</label><select value={newHoliday.type} onChange={(e) => setNewHoliday({ ...newHoliday, type: e.target.value })} className="block w-full rounded-md border-gray-300 shadow-sm"><option value="CUSTOM">Custom</option><option value="SUNDAY">Sunday</option><option value="SATURDAY_2_4">2nd/4th Saturday</option></select></div>
                   <div className="flex justify-end space-x-3">
                     <button type="button" onClick={() => setIsHolidayModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg">Cancel</button>
