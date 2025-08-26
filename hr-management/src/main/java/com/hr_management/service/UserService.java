@@ -355,8 +355,11 @@ public class UserService implements UserDetailsService {
     }
 
     public List<PendingSignup> getPendingUsers() {
+
         logger.info("Fetching pending signup requests");
+
         return pendingSignupRepository.findByStatus("PENDING");
+
     }
     public List<PendingSignup> getPendingHrSignups() {
         logger.info("Fetching pending HR signup requests for Super Admin");

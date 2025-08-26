@@ -1,50 +1,55 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, Clock, CheckCircle, AlertCircle, Building, Menu, X, LogOut, Download, ChevronLeft, ChevronRight, FileText, UserPlus, Calendar, UserCheck, Bell, List } from 'lucide-react';
+// ++ MODIFIED: Added ChevronFirst and ChevronLast for pagination
+import { Users, Clock, CheckCircle, AlertCircle, Building, Menu, X, LogOut, Download, ChevronLeft, ChevronRight, FileText, UserPlus, Calendar, UserCheck, Bell, List, ChevronFirst, ChevronLast } from 'lucide-react';
 import ExcelJS from 'exceljs';
 
-// New Reusable Pagination Component (Keep this here or move to a separate file)
+// ++ MODIFIED: Reusable Pagination Component with First/Last buttons
 function PaginationControls({ currentPage, totalItems, itemsPerPage, onPageChange }) {
   const totalPages = Math.ceil(totalItems / itemsPerPage);
 
   if (totalPages <= 1) {
-    return null; // Don't show pagination if there's only one page
+    return null;
   }
-
-  const handlePrev = () => {
-    if (currentPage > 1) {
-      onPageChange(currentPage - 1);
-    }
-  };
-
-  const handleNext = () => {
-    if (currentPage < totalPages) {
-      onPageChange(currentPage + 1);
-    }
-  };
 
   return (
       <div className="flex items-center justify-between mt-4 px-4 py-2 bg-gray-50 border-t">
         <div className="text-sm text-gray-700">
           Showing <span className="font-semibold">{Math.min((currentPage - 1) * itemsPerPage + 1, totalItems)}</span> to <span className="font-semibold">{Math.min(currentPage * itemsPerPage, totalItems)}</span> of <span className="font-semibold">{totalItems}</span> results
         </div>
-        <div className="flex items-center space-x-2">
-         <span className="text-sm text-gray-700">
-            Page <span className="font-semibold">{currentPage}</span> of <span className="font-semibold">{totalPages}</span>
-        </span>
+        <div className="flex items-center space-x-1">
           <button
-              onClick={handlePrev}
+              onClick={() => onPageChange(1)}
+              disabled={currentPage === 1}
+              className="p-2 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Go to first page"
+          >
+            <ChevronFirst size={16} />
+          </button>
+          <button
+              onClick={() => onPageChange(currentPage - 1)}
               disabled={currentPage === 1}
               className="px-3 py-1 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Previous
           </button>
+          <span className="text-sm text-gray-700 px-3">
+                    Page <span className="font-semibold">{currentPage}</span> of <span className="font-semibold">{totalPages}</span>
+                </span>
           <button
-              onClick={handleNext}
+              onClick={() => onPageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
               className="px-3 py-1 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Next
+          </button>
+          <button
+              onClick={() => onPageChange(totalPages)}
+              disabled={currentPage === totalPages}
+              className="p-2 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Go to last page"
+          >
+            <ChevronLast size={16} />
           </button>
         </div>
       </div>
@@ -1280,17 +1285,12 @@ export default function HRDashboard() {
   };
 
   const renderProfileVerificationList = () => {
-    // Filter logic is now at the top
     const filteredProfiles = profileVerificationList.filter(profile => {
-      // Filter by status from the dropdown
       const matchesStatus = profileVerificationFilterStatus === 'ALL' || profile.profileVerificationStatus === profileVerificationFilterStatus;
-
-      // Filter by search term from the input box
       const normalizedSearch = profileVerificationSearchTerm.toLowerCase();
       const matchesSearch = !profileVerificationSearchTerm ||
           profile.fullName.toLowerCase().includes(normalizedSearch) ||
           (profile.employeeId && profile.employeeId.toLowerCase().includes(normalizedSearch));
-
       return matchesStatus && matchesSearch;
     });
 
@@ -1303,7 +1303,6 @@ export default function HRDashboard() {
         <div className="space-y-6">
           <h2 className="text-2xl font-semibold text-gray-900">Profile Verification Requests</h2>
 
-          {/* ++ NEW: Search and Filter controls ++ */}
           <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <input
@@ -1312,7 +1311,7 @@ export default function HRDashboard() {
                   value={profileVerificationSearchTerm}
                   onChange={e => {
                     setProfileVerificationSearchTerm(e.target.value);
-                    setProfileVerificationPage(1); // Reset to first page on search
+                    setProfileVerificationPage(1);
                   }}
                   className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
               />
@@ -1320,7 +1319,7 @@ export default function HRDashboard() {
                   value={profileVerificationFilterStatus}
                   onChange={e => {
                     setProfileVerificationFilterStatus(e.target.value);
-                    setProfileVerificationPage(1); // Reset to first page on filter change
+                    setProfileVerificationPage(1);
                   }}
                   className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
               >
@@ -1344,6 +1343,8 @@ export default function HRDashboard() {
                     <tr>
                       <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Employee ID</th>
                       <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Employee Name</th>
+                      {/* ++ NEW: Timestamp column header ++ */}
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Submitted At</th>
                       <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Status</th>
                       <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
                     </tr>
@@ -1353,14 +1354,18 @@ export default function HRDashboard() {
                         <tr key={profile.userId} className="hover:bg-gray-50 transition duration-150">
                           <td className="px-6 py-4 whitespace-nowrap text-gray-900">{profile.employeeId}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-gray-900">{profile.fullName}</td>
+                          {/* ++ NEW: Timestamp data cell. Assumes 'submittedAt' exists. ++ */}
+                          <td className="px-6 py-4 whitespace-nowrap text-gray-600 text-sm">
+                            {profile.submittedAt ? new Date(profile.submittedAt).toLocaleString() : 'N/A'}
+                          </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                                profile.profileVerificationStatus === 'VERIFIED' ? 'bg-green-100 text-green-800' :
-                                                    profile.profileVerificationStatus === 'SUBMITTED' ? 'bg-yellow-100 text-yellow-800' :
-                                                        'bg-red-100 text-red-800'
-                                            }`}>
-                                                {profile.profileVerificationStatus}
-                                            </span>
+                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                profile.profileVerificationStatus === 'VERIFIED' ? 'bg-green-100 text-green-800' :
+                                    profile.profileVerificationStatus === 'SUBMITTED' ? 'bg-yellow-100 text-yellow-800' :
+                                        'bg-red-100 text-red-800'
+                            }`}>
+                                {profile.profileVerificationStatus}
+                            </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <button
@@ -1373,7 +1378,8 @@ export default function HRDashboard() {
                         </tr>
                     )) : (
                         <tr>
-                          <td colSpan="4" className="text-center py-10 text-gray-500">
+                          {/* ++ MODIFIED: colspan updated from 4 to 5 ++ */}
+                          <td colSpan="5" className="text-center py-10 text-gray-500">
                             No profiles found matching your criteria.
                           </td>
                         </tr>
@@ -1413,6 +1419,8 @@ export default function HRDashboard() {
                     <tr>
                       <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Employee ID</th>
                       <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Employee Name</th>
+                      {/* ++ NEW: Timestamp column header ++ */}
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Requested At</th>
                       <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
                     </tr>
                     </thead>
@@ -1421,6 +1429,10 @@ export default function HRDashboard() {
                         <tr key={req.userId} className="hover:bg-gray-50 transition duration-150">
                           <td className="px-6 py-4 whitespace-nowrap text-gray-900">{req.employeeId}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-gray-900">{req.fullName}</td>
+                          {/* ++ NEW: Timestamp data cell. Assumes 'requestedAt' exists. ++ */}
+                          <td className="px-6 py-4 whitespace-nowrap text-gray-600 text-sm">
+                            {req.requestedAt ? new Date(req.requestedAt).toLocaleString() : 'N/A'}
+                          </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <button
                                 onClick={() => handleAllowUpdate(req.userId)}
@@ -1586,6 +1598,8 @@ export default function HRDashboard() {
                       <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Name</th>
                       <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Date</th>
                       <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Type</th>
+                      {/* ++ NEW: Timestamp column header ++ */}
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Created At</th>
                       <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
                     </tr>
                     </thead>
@@ -1595,6 +1609,10 @@ export default function HRDashboard() {
                           <td className="px-6 py-4 whitespace-nowrap text-gray-900">{holiday.name}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-gray-600">{holiday.date}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-gray-600">{holiday.type}</td>
+                          {/* ++ NEW: Timestamp data cell. Assumes 'createdAt' exists. ++ */}
+                          <td className="px-6 py-4 whitespace-nowrap text-gray-600 text-sm">
+                            {holiday.createdAt ? new Date(holiday.createdAt).toLocaleString() : 'N/A'}
+                          </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <button
                                 onClick={() => handleDeleteHoliday(holiday.id)}
@@ -1667,15 +1685,16 @@ export default function HRDashboard() {
             <table className="w-full divide-y divide-gray-200 table-fixed">
               <thead className="bg-gray-50">
               <tr>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[6%] min-w-[40px]">ID</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[5%] min-w-[40px]">ID</th>
                 <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[10%] min-w-[80px]">Name</th>
                 <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[10%] min-w-[70px]">Role</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[14%] min-w-[90px]">Department</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[10%] min-w-[60px]">Gender</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[14%] min-w-[90px]">Reporting To</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[12%] min-w-[80px]">Join Date</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[10%] min-w-[90px]">Department</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[10%] min-w-[90px]">Reporting To</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[10%] min-w-[80px]">Join Date</th>
+                {/* ++ NEW: Timestamp column header ++ */}
+                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[15%] min-w-[120px]">Submitted At</th>
                 <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[10%] min-w-[60px]">Status</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[18%] min-w-[140px]">Actions</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[15%] min-w-[140px]">Actions</th>
               </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -1685,9 +1704,12 @@ export default function HRDashboard() {
                     <td className="px-3 py-2 text-gray-900 truncate text-xs">{user.fullName}</td>
                     <td className="px-3 py-2 text-gray-600 text-xs">{user.role}</td>
                     <td className="px-3 py-2 text-gray-600 text-xs">{user.department || 'N/A'}</td>
-                    <td className="px-3 py-2 text-gray-600 text-xs">{user.gender || 'N/A'}</td>
                     <td className="px-3 py-2 text-gray-600 truncate text-xs">{user.reportingToName || 'N/A'}</td>
                     <td className="px-3 py-2 text-gray-600 text-xs">{user.joinDate || 'N/A'}</td>
+                    {/* ++ NEW: Timestamp data cell. Assumes 'submittedAt' exists. ++ */}
+                    <td className="px-3 py-2 text-gray-600 text-xs">
+                      {user.submittedAt ? new Date(user.submittedAt).toLocaleString() : 'N/A'}
+                    </td>
                     <td className="px-3 py-2 text-gray-600 text-xs">{user.status}</td>
                     <td className="px-3 py-2">
                       <div className="flex space-x-1 flex-nowrap">
